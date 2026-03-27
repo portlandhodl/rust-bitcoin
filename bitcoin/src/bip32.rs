@@ -575,7 +575,7 @@ impl Xpriv {
             depth: 0,
             parent_fingerprint: Default::default(),
             child_number: ChildNumber::from_normal_idx(0)?,
-            private_key: secp256k1::SecretKey::from_slice(&hmac_result[..32])?,
+            private_key: secp256k1::SecretKey::from_secret_bytes(hmac_result[..32].try_into().unwrap())?,
             chain_code: ChainCode::from_hmac(hmac_result),
         })
     }
@@ -588,7 +588,7 @@ impl Xpriv {
     /// Constructs BIP340 keypair for Schnorr signatures and Taproot use matching the internal
     /// secret key representation.
     pub fn to_keypair<C: secp256k1::Signing>(self, secp: &Secp256k1<C>) -> Keypair {
-        Keypair::from_seckey_slice(secp, &self.private_key[..])
+        Keypair::from_seckey_slice(&self.private_key[..])
             .expect("BIP32 internal private key representation is broken")
     }
 
@@ -618,7 +618,7 @@ impl Xpriv {
             ChildNumber::Normal { .. } => {
                 // Non-hardened key: compute public data and use that
                 hmac_engine.input(
-                    &secp256k1::PublicKey::from_secret_key(secp, &self.private_key).serialize()[..],
+                    &secp256k1::PublicKey::from_secret_key(&self.private_key).serialize()[..],
                 );
             }
             ChildNumber::Hardened { .. } => {
@@ -630,8 +630,10 @@ impl Xpriv {
 
         hmac_engine.input(&u32::from(i).to_be_bytes());
         let hmac_result: Hmac<sha512::Hash> = Hmac::from_engine(hmac_engine);
-        let sk = secp256k1::SecretKey::from_slice(&hmac_result[..32])
-            .expect("statistically impossible to hit");
+        let sk = secp256k1::SecretKey::from_secret_bytes(
+            hmac_result[..32].try_into().unwrap()
+        )
+        .expect("statistically impossible to hit");
         let tweaked =
             sk.add_tweak(&self.private_key.into()).expect("statistically impossible to hit");
 
@@ -670,7 +672,9 @@ impl Xpriv {
             chain_code: data[13..45]
                 .try_into()
                 .expect("45 - 13 == 32, which is the ChainCode length"),
-            private_key: secp256k1::SecretKey::from_slice(&data[46..78])?,
+            private_key: secp256k1::SecretKey::from_secret_bytes(
+                data[46..78].try_into().unwrap()
+            )?,
         })
     }
 
@@ -709,7 +713,7 @@ impl Xpub {
             depth: sk.depth,
             parent_fingerprint: sk.parent_fingerprint,
             child_number: sk.child_number,
-            public_key: secp256k1::PublicKey::from_secret_key(secp, &sk.private_key),
+            public_key: secp256k1::PublicKey::from_secret_key(&sk.private_key),
             chain_code: sk.chain_code,
         }
     }
@@ -751,7 +755,9 @@ impl Xpub {
 
                 let hmac_result: Hmac<sha512::Hash> = Hmac::from_engine(hmac_engine);
 
-                let private_key = secp256k1::SecretKey::from_slice(&hmac_result[..32])?;
+                let private_key = secp256k1::SecretKey::from_secret_bytes(
+                    hmac_result[..32].try_into().unwrap()
+                ).map_err(|e| Error::Secp256k1(e))?;
                 let chain_code = ChainCode::from_hmac(hmac_result);
                 Ok((private_key, chain_code))
             }
@@ -765,7 +771,7 @@ impl Xpub {
         i: ChildNumber,
     ) -> Result<Xpub, Error> {
         let (sk, chain_code) = self.ckd_pub_tweak(i)?;
-        let tweaked = self.public_key.add_exp_tweak(secp, &sk.into())?;
+        let tweaked = self.public_key.add_exp_tweak(&sk.into())?;
 
         Ok(Xpub {
             network: self.network,

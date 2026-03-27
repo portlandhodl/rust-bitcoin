@@ -1282,7 +1282,7 @@ impl ControlBlock {
         // compute the taptweak
         let tweak =
             TapTweakHash::from_key_and_tweak(self.internal_key, Some(curr_hash)).to_scalar();
-        self.internal_key.tweak_add_check(secp, &output_key, self.output_key_parity, tweak)
+        self.internal_key.tweak_add_check(&output_key, self.output_key_parity, tweak)
     }
 }
 

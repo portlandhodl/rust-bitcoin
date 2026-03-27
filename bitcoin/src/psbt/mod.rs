@@ -369,7 +369,7 @@ impl Psbt {
             };
 
             let sig =
-                ecdsa::Signature { sig: secp.sign_ecdsa(&msg, &sk.inner), hash_ty: sighash_ty };
+                ecdsa::Signature { sig: secp.sign_ecdsa(msg, &sk.inner), hash_ty: sighash_ty };
 
             let pk = sk.public_key(secp);
 
