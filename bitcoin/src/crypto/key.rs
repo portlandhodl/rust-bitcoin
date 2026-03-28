@@ -433,7 +433,7 @@ impl PrivateKey {
     pub fn public_key<C: secp256k1::Signing>(&self, secp: &Secp256k1<C>) -> PublicKey {
         PublicKey {
             compressed: self.compressed,
-            inner: secp256k1::PublicKey::from_secret_key(secp, &self.inner),
+            inner: secp256k1::PublicKey::from_secret_key(&self.inner),
         }
     }
 
@@ -445,7 +445,7 @@ impl PrivateKey {
         data: &[u8],
         network: impl Into<NetworkKind>,
     ) -> Result<PrivateKey, secp256k1::Error> {
-        Ok(PrivateKey::new(secp256k1::SecretKey::from_slice(data)?, network))
+        Ok(PrivateKey::new(secp256k1::SecretKey::from_secret_bytes(data.try_into().expect("32 bytes"))?, network))
     }
 
     /// Format the private key to WIF format.
@@ -495,7 +495,7 @@ impl PrivateKey {
         Ok(PrivateKey {
             compressed,
             network,
-            inner: secp256k1::SecretKey::from_slice(&data[1..33])?,
+            inner: secp256k1::SecretKey::from_secret_bytes(data[1..33].try_into().expect("32 bytes"))?,
         })
     }
 }
@@ -784,9 +784,9 @@ impl TapTweak for UntweakedPublicKey {
         merkle_root: Option<TapNodeHash>,
     ) -> (TweakedPublicKey, Parity) {
         let tweak = TapTweakHash::from_key_and_tweak(self, merkle_root).to_scalar();
-        let (output_key, parity) = self.add_tweak(secp, &tweak).expect("Tap tweak failed");
+        let (output_key, parity) = self.add_tweak(&tweak).expect("Tap tweak failed");
 
-        debug_assert!(self.tweak_add_check(secp, &output_key, parity, tweak));
+        debug_assert!(self.tweak_add_check(&output_key, parity, tweak));
         (TweakedPublicKey(output_key), parity)
     }
 
@@ -816,7 +816,7 @@ impl TapTweak for UntweakedKeypair {
     ) -> TweakedKeypair {
         let (pubkey, _parity) = XOnlyPublicKey::from_keypair(&self);
         let tweak = TapTweakHash::from_key_and_tweak(pubkey, merkle_root).to_scalar();
-        let tweaked = self.add_xonly_tweak(secp, &tweak).expect("Tap tweak failed");
+        let tweaked = self.add_xonly_tweak(&tweak).expect("Tap tweak failed");
         TweakedKeypair(tweaked)
     }
 
@@ -1517,7 +1517,7 @@ mod tests {
         let sk =
             PrivateKey::from_str("cVt4o7BGAig1UXywgGSmARhxMdzP5qvQsxKkSsc1XEkw3tDTQFpy").unwrap();
         let want =
-            "PrivateKey { compressed: true, network: Test, inner: SecretKey(#7217ac58fbad8880) }";
+            "PrivateKey { compressed: true, network: Test, inner: SecretKey(631b5bcb0c6b6a17) }";
         let got = format!("{:?}", sk);
         assert_eq!(got, want)
     }

@@ -96,15 +96,11 @@ mod message_signing {
             MessageSignature { signature, compressed }
         }
 
-        /// Serialize to bytes.
+        /// Serializes to bytes.
         pub fn serialize(&self) -> [u8; 65] {
             let (recid, raw) = self.signature.serialize_compact();
             let mut serialized = [0u8; 65];
-            serialized[0] = 27;
-            serialized[0] += i32::from(recid) as u8;
-            if self.compressed {
-                serialized[0] += 4;
-            }
+            serialized[0] = recid.to_u8() + if self.compressed { 31 } else { 27 };
             serialized[1..].copy_from_slice(&raw[..]);
             serialized
         }
