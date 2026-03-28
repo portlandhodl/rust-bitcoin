@@ -206,7 +206,7 @@ impl PublicKey {
         msg: &secp256k1::Message,
         sig: &ecdsa::Signature,
     ) -> Result<(), secp256k1::Error> {
-        secp.verify_ecdsa(msg, &sig.signature, &self.inner)
+        secp.verify_ecdsa(*msg, &sig.signature, &self.inner)
     }
 }
 
@@ -339,7 +339,7 @@ impl CompressedPublicKey {
         msg: &secp256k1::Message,
         sig: &ecdsa::Signature,
     ) -> Result<(), secp256k1::Error> {
-        Ok(secp.verify_ecdsa(msg, &sig.signature, &self.0)?)
+        Ok(secp.verify_ecdsa(*msg, &sig.signature, &self.0)?)
     }
 }
 
@@ -409,7 +409,9 @@ impl PrivateKey {
     /// a secure random number generator.
     #[cfg(feature = "rand-std")]
     pub fn generate(network: impl Into<NetworkKind>) -> PrivateKey {
-        let secret_key = secp256k1::SecretKey::new(&mut rand::thread_rng());
+        let secp = Secp256k1::new();
+        let keypair = Keypair::new(&secp, &mut secp256k1::rand::thread_rng());
+        let secret_key = secp256k1::SecretKey::from_keypair(&keypair);
         PrivateKey::new(secret_key, network.into())
     }
     /// Constructs compressed ECDSA private key from the provided generic Secp256k1 private key
@@ -1515,7 +1517,7 @@ mod tests {
         let sk =
             PrivateKey::from_str("cVt4o7BGAig1UXywgGSmARhxMdzP5qvQsxKkSsc1XEkw3tDTQFpy").unwrap();
         let want =
-            "PrivateKey { compressed: true, network: Test, inner: SecretKey(#32014e414fdce702) }";
+            "PrivateKey { compressed: true, network: Test, inner: SecretKey(#7217ac58fbad8880) }";
         let got = format!("{:?}", sk);
         assert_eq!(got, want)
     }

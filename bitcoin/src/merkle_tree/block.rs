@@ -585,7 +585,7 @@ mod tests {
 
         use crate::merkle_tree;
 
-        let mut rng = thread_rng();
+        let mut rng = secp256k1::rand::rng();
         // Create some fake tx ids
         let tx_ids = (1..=tx_count)
             .map(|i| format!("{:064x}", i).parse::<Txid>().unwrap())
