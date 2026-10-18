@@ -5,7 +5,15 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::many_single_char_names)]
 
-#[cfg(all(target_arch = "aarch64", any(feature = "std", feature = "cpufeatures")))]
+// The ARM SHA2 backend loads message words as native-endian `u32` and then
+// byte-reverses them for little-endian memory order. That is only correct on
+// little-endian AArch64; big-endian targets use the software fallback, which
+// decodes words with `u32::from_be_bytes`.
+#[cfg(all(
+    target_arch = "aarch64",
+    target_endian = "little",
+    any(feature = "std", feature = "cpufeatures")
+))]
 use core::arch::aarch64::{
     vaddq_u32, vld1q_u32, vreinterpretq_u32_u8, vreinterpretq_u8_u32, vrev32q_u8, vsha256h2q_u32,
     vsha256hq_u32, vsha256su0q_u32, vsha256su1q_u32, vst1q_u32,
@@ -27,7 +35,11 @@ use internals::slice::SliceExt;
 
 use super::{HashEngine, Midstate, BLOCK_SIZE};
 
-#[cfg(all(feature = "cpufeatures", target_arch = "aarch64"))]
+#[cfg(all(
+    feature = "cpufeatures",
+    target_arch = "aarch64",
+    target_endian = "little"
+))]
 // cpufeatures crate internally uses `u8::max_value()` which will be deprecated.
 // See: https://docs.rs/cpufeatures/0.2.17/src/cpufeatures/lib.rs.html#161
 #[allow(deprecated_in_future)]
@@ -310,7 +322,7 @@ impl HashEngine {
             }
         }
 
-        #[cfg(all(feature = "std", target_arch = "aarch64"))]
+        #[cfg(all(feature = "std", target_arch = "aarch64", target_endian = "little"))]
         {
             if std::arch::is_aarch64_feature_detected!("sha2") {
                 for block in blocks.chunks_exact(BLOCK_SIZE) {
@@ -320,7 +332,7 @@ impl HashEngine {
             }
         }
 
-        #[cfg(all(feature = "cpufeatures", target_arch = "aarch64"))]
+        #[cfg(all(feature = "cpufeatures", target_arch = "aarch64", target_endian = "little"))]
         {
             if cpuid_sha256_aarch64::get() {
                 for block in blocks.chunks_exact(BLOCK_SIZE) {
@@ -596,7 +608,11 @@ impl HashEngine {
         _mm_storeu_si128(state.as_mut_ptr().add(4).cast::<__m128i>(), state1);
     }
 
-    #[cfg(all(target_arch = "aarch64", any(feature = "std", feature = "cpufeatures")))]
+    #[cfg(all(
+        target_arch = "aarch64",
+        target_endian = "little",
+        any(feature = "std", feature = "cpufeatures")
+    ))]
     #[target_feature(enable = "sha2")]
     unsafe fn process_block_simd_arm_intrinsics(state: &mut [u32; 8], block: &[u8]) {
         // Code translated and based on from
